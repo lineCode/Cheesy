@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 	_START_EASYLOGGINGPP(argc, argv);
 	configureLogger();
 	int c;
-	int daemonPort = 11111;
+	int daemonPort = 11112;
 	int monitorSourceIndex = 0;
 	bool verbose = false;
 	bool daemon = false;
