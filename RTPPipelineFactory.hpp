@@ -20,7 +20,7 @@ using std::string;
 
 struct ClientTemplates {
 	string rtpBin = "gstrtpbin name=rtpbin";
-	string videoSource = "ximagesrc";
+	string videoSource = "ximagesrc show-pointer=false";
 	string colospaceConvert = "ffmpegcolorspace";
 	string encoderString;
 	string videoSink =
