@@ -4,9 +4,9 @@ SRCS    := cheesy.cpp PulseMonitorSource.cpp CapsServer.cpp CapsClient.cpp Caps.
 OBJS    := ${SRCS:.cpp=.o} 
 DEPS    := ${SRCS:.cpp=.dep} 
 PREFIX  := /usr/bin/
-CXXFLAGS = -pedantic -std=c++11 `pkg-config --cflags libpulse` `pkg-config --cflags gstreamer-0.10` -D_ELPP_THREAD_SAFE
+CXXFLAGS = -pedantic -std=c++11 `pkg-config --cflags libpulse gtk+-2.0 gstreamer-interfaces-0.10 gstreamer-0.10` -D_ELPP_THREAD_SAFE
 LDFLAGS = 
-LIBS    =  -lboost_thread -lboost_system `pkg-config --libs libpulse` `pkg-config --libs gstreamer-0.10`
+LIBS    =  -lboost_system `pkg-config --libs libpulse gtk+-2.0 gstreamer-interfaces-0.10 gstreamer-0.10`
 
 .PHONY: all clean
 

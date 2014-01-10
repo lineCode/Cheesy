@@ -11,8 +11,7 @@
 #include <gst/gst.h>
 #include <string>
 #include <exception>
-#include <boost/thread.hpp>
-#include <boost/exception/all.hpp>
+#include <thread>
 #include "easylogging++.h"
 
 namespace cheesy {
@@ -20,7 +19,6 @@ namespace cheesy {
 using std::string;
 
 class pipeline_failed :
-  public boost::exception,
   public std::exception
 {
 public:
@@ -39,7 +37,7 @@ private:
 
 class Pipeline {
 	GstElement* pipeline;
-	boost::thread msgThread;
+	std::thread msgThread;
 	GstBus* bus;
 	string strPipeline;
 public:
@@ -49,6 +47,11 @@ public:
 		if(pipeline == NULL) {
 			throw pipeline_failed(error->message);
 		}
+		this->bus = gst_element_get_bus(pipeline);
+	}
+
+	GstBus* getBus() {
+		return this->bus;
 	}
 
 	string getPadCaps(string elementName, string padName) {
@@ -100,17 +103,12 @@ public:
 		this->join();
 	}
 
-	void play() {
+	void play(bool waitForAsyncDone) {
 		GstMessage *msg;
-		this->bus = gst_element_get_bus(pipeline);
 		gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
-		// wait for the pipeline to preroll
-		msg = gst_bus_poll(bus, GST_MESSAGE_ASYNC_DONE, -1);
-
-		LOG(INFO) << "Pipeline playing";
-
-		msgThread = boost::thread([=](){
+		msgThread = std::thread([=](){
+			LOG(DEBUG) << "Message thread started";
 			GstMessage* m = gst_bus_poll(this->bus, (GstMessageType)(GST_MESSAGE_ERROR | GST_MESSAGE_EOS), -1);
 
 			GError *err = NULL;
@@ -140,8 +138,14 @@ public:
 			gst_object_unref(pipeline);
 			gst_object_unref(bus);
 			LOG(INFO) << "Pipeline stopped";
+			LOG(DEBUG) << "Message thread stopped";
 		});
 
+		// wait for the pipeline to preroll
+		if(waitForAsyncDone)
+			msg = gst_bus_poll(bus, GST_MESSAGE_ASYNC_DONE, -1);
+
+		LOG(INFO) << "Pipeline playing";
 	}
 };
 

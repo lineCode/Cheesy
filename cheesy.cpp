@@ -10,13 +10,14 @@
 #include <string>
 #include <sstream>
 #include <fstream>
-
+#include <gtk/gtk.h>
+#include <gst/interfaces/xoverlay.h>
+#include <gdk/gdkx.h>
 #include "easylogging++.h"
 
 _INITIALIZE_EASYLOGGINGPP
 
 class codecloader_failed :
-  public boost::exception,
   public std::exception
 {
 public:
@@ -92,12 +93,53 @@ void configureLogger() {
 	el::Loggers::reconfigureLogger("default", defaultConf);
 }
 
+static void make_window_black(GtkWidget *window)
+{
+    GdkColor color;
+    gdk_color_parse("black", &color);
+    gtk_widget_modify_bg(window, GTK_STATE_NORMAL, &color);
+}
+
+gboolean handle_bus_msg(GstMessage * message, GtkWidget *window)
+{
+    // ignore anything but 'prepare-xwindow-id' element messages
+    if (GST_MESSAGE_TYPE(message) != GST_MESSAGE_ELEMENT)
+        return FALSE;
+
+    if (!gst_structure_has_name(message->structure, "prepare-xwindow-id"))
+        return FALSE;
+
+    g_print("Got prepare-xwindow-id msg\n");
+    // FIXME: see https://bugzilla.gnome.org/show_bug.cgi?id=599885
+    gst_x_overlay_set_xwindow_id(GST_X_OVERLAY(GST_MESSAGE_SRC(message)), GDK_WINDOW_XWINDOW(window->window));
+
+    return TRUE;
+}
+
+gboolean bus_call(GstBus * bus, GstMessage *msg, gpointer data)
+{
+    GtkWidget *window = (GtkWidget*) data;
+    switch(GST_MESSAGE_TYPE(msg))
+    {
+        case GST_MESSAGE_ELEMENT:
+            handle_bus_msg(msg, window);
+            break;
+
+        default:
+            break;
+    }
+
+    return TRUE;
+}
+
 int main(int argc, char *argv[]) {
 	gst_init(0, NULL);
+	gtk_init(0, NULL);
+
 	_START_EASYLOGGINGPP(argc, argv);
 	configureLogger();
 	int c;
-	int daemonPort = 11112;
+	int daemonPort = 1111;
 	int monitorSourceIndex = 0;
 	bool verbose = false;
 	bool daemon = false;
@@ -148,7 +190,7 @@ int main(int argc, char *argv[]) {
 	loadCodecs(codecsFile);
 
 	if (verbose) {
-		gst_debug_set_default_threshold(GST_LEVEL_INFO);
+		gst_debug_set_default_threshold(GST_LEVEL_TRACE);
 	}
 	else {
 		gst_debug_set_default_threshold(GST_LEVEL_NONE);
@@ -159,6 +201,11 @@ int main(int argc, char *argv[]) {
 
 	if (daemon) {
 		CapsServer server(daemonPort);
+		GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+		gtk_window_fullscreen(GTK_WINDOW(window));
+		make_window_black(window);
+		gtk_widget_show_all(window);
+
 		while (true) {
 			LOG(INFO) << "Waiting for incoming connection";
 			ConnectionInfo ci = server.accept();
@@ -170,7 +217,9 @@ int main(int argc, char *argv[]) {
 			}
 
 			pipeline = factory.createServerPipeline(daemonPort, ci);
-			pipeline->play();
+			gst_bus_add_watch(pipeline->getBus(), (GstBusFunc) bus_call, window);
+			pipeline->play(false);
+
 		}
 	} else if ((argc - optind) == 1) {
 		auto monitors = getPulseMonitorSource();
@@ -181,7 +230,7 @@ int main(int argc, char *argv[]) {
 
 			cheesy::RTPPipelineFactory f;
 			Pipeline* pipeline = f.createClientPipeline(monitors[monitorSourceIndex], host, daemonPort, Codec::getCodec(codecName));
-			pipeline->play();
+			pipeline->play(true);
 
 			std::string rtpCaps = pipeline->getPadCaps("vpsink","sink");
 			CapsClient client;
@@ -200,6 +249,7 @@ int main(int argc, char *argv[]) {
 			} catch(std::exception& ex) {
 				LOG(INFO) << "You were kicked.";
 			}
+
 			pipeline->stop();
 			return 0;
 		} else {

@@ -45,7 +45,7 @@ struct ServerTemplates {
 	string videoControlSink = "rtpbin.send_rtcp_src_0 ! udpsink name=vcsink";
 	string audioPipelineString =
 			"udpsrc name=apsrc ! rtpbin.recv_rtp_sink_1 \
-rtpbin. ! rtpopusdepay ! opusdec ! audioconvert ! audioresample ! fakesink \
+rtpbin. ! rtpopusdepay ! opusdec ! audioconvert ! audioresample ! autoaudiosink \
 udpsrc name=acsrc ! rtpbin.recv_rtcp_sink_1 \
 rtpbin.send_rtcp_src_1 ! udpsink name=acsink";
 };
