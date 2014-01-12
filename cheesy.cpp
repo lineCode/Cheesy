@@ -11,7 +11,6 @@
 #include <sstream>
 #include <fstream>
 #include <gtk/gtk.h>
-#include <gst/interfaces/xoverlay.h>
 #include <gdk/gdkx.h>
 #include "easylogging++.h"
 
@@ -66,10 +65,13 @@ void printUsage() {
 	std::cerr << "Usage: cheesy [-d][-v][-p <daemonPort>][-m <index>] <target>..." << std::endl;
 	std::cerr << "Options:" << std::endl;
 	std::cerr << "\t-d\t\tstart the cheesy daemon" << std::endl;
-	std::cerr << "\t-r\t\tsend/receive raw audio" << std::endl;
 	std::cerr << "\t-v\t\tgenerate verbose output" << std::endl;
 	std::cerr << "\t-p <port>\tport to listen/connect to" << std::endl;
 	std::cerr << "\t-m <index>\tindex of the monitor source" << std::endl;
+	std::cerr << "\t-y \tshow mouse pointer" << std::endl;
+	std::cerr << "\t-w \tenable fullscreen mode" << std::endl;
+	std::cerr << "\t-f <codecsFile>\tuse given codecs file" << std::endl;
+	std::cerr << "\t-c <codecsName>\tuse given codec profile" << std::endl;
 }
 
 void configureLogger() {
@@ -100,38 +102,6 @@ static void make_window_black(GtkWidget *window)
     gtk_widget_modify_bg(window, GTK_STATE_NORMAL, &color);
 }
 
-gboolean handle_bus_msg(GstMessage * message, GtkWidget *window)
-{
-    // ignore anything but 'prepare-xwindow-id' element messages
-    if (GST_MESSAGE_TYPE(message) != GST_MESSAGE_ELEMENT)
-        return FALSE;
-
-    if (!gst_structure_has_name(message->structure, "prepare-xwindow-id"))
-        return FALSE;
-
-    g_print("Got prepare-xwindow-id msg\n");
-    // FIXME: see https://bugzilla.gnome.org/show_bug.cgi?id=599885
-    gst_x_overlay_set_xwindow_id(GST_X_OVERLAY(GST_MESSAGE_SRC(message)), GDK_WINDOW_XWINDOW(window->window));
-
-    return TRUE;
-}
-
-gboolean bus_call(GstBus * bus, GstMessage *msg, gpointer data)
-{
-    GtkWidget *window = (GtkWidget*) data;
-    switch(GST_MESSAGE_TYPE(msg))
-    {
-        case GST_MESSAGE_ELEMENT:
-            handle_bus_msg(msg, window);
-            break;
-
-        default:
-            break;
-    }
-
-    return TRUE;
-}
-
 int main(int argc, char *argv[]) {
 	gst_init(0, NULL);
 	gtk_init(0, NULL);
@@ -143,18 +113,21 @@ int main(int argc, char *argv[]) {
 	int monitorSourceIndex = 0;
 	bool verbose = false;
 	bool daemon = false;
-	bool raw = false;
 	std::string codecsFile = "/etc/cheesy/codecs";
-	std::string codecName = "MPEG4";
+	std::string codecName = "MPEG4_HIGH";
+	bool showPointer = false;
+	bool fullscreen = false;
 
-
-	while ((c = getopt(argc, argv, "dvhr?p:m:f:c:")) != -1) {
+	while ((c = getopt(argc, argv, "wydvh?p:m:f:c:")) != -1) {
 		switch (c) {
+		case 'w':
+			fullscreen = true;
+			break;
 		case 'd':
 			daemon = true;
 			break;
-		case 'r':
-			raw = true;
+		case 'y':
+			showPointer = true;
 			break;
 		case 'v':
 			verbose = true;
@@ -202,7 +175,8 @@ int main(int argc, char *argv[]) {
 	if (daemon) {
 		CapsServer server(daemonPort);
 		GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-		gtk_window_fullscreen(GTK_WINDOW(window));
+		if(fullscreen)
+			gtk_window_fullscreen(GTK_WINDOW(window));
 		make_window_black(window);
 		gtk_widget_show_all(window);
 
@@ -217,9 +191,9 @@ int main(int argc, char *argv[]) {
 			}
 
 			pipeline = factory.createServerPipeline(daemonPort, ci);
-			gst_bus_add_watch(pipeline->getBus(), (GstBusFunc) bus_call, window);
-			pipeline->play(false);
-
+			//gst_bus_add_watch(pipeline->getBus(), (GstBusFunc) bus_call, window);
+			pipeline->setXVtarget(window);
+			pipeline->play();
 		}
 	} else if ((argc - optind) == 1) {
 		auto monitors = getPulseMonitorSource();
@@ -229,8 +203,8 @@ int main(int argc, char *argv[]) {
 			LOG(INFO) << "Selected monitor source: " << monitors[monitorSourceIndex];
 
 			cheesy::RTPPipelineFactory f;
-			Pipeline* pipeline = f.createClientPipeline(monitors[monitorSourceIndex], host, daemonPort, Codec::getCodec(codecName));
-			pipeline->play(true);
+			Pipeline* pipeline = f.createClientPipeline(monitors[monitorSourceIndex], host, daemonPort, Codec::getCodec(codecName),showPointer);
+			pipeline->play();
 
 			std::string rtpCaps = pipeline->getPadCaps("vpsink","sink");
 			CapsClient client;
