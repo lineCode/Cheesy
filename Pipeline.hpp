@@ -13,6 +13,9 @@
 #include <exception>
 #include <thread>
 #include "easylogging++.h"
+#include <gtk/gtk.h>
+#include <gst/interfaces/xoverlay.h>
+#include <gdk/gdkx.h>
 
 namespace cheesy {
 
@@ -40,6 +43,7 @@ class Pipeline {
 	std::thread msgThread;
 	GstBus* bus;
 	string strPipeline;
+	GtkWidget* window = NULL;
 public:
 	Pipeline(string strPipeline) : pipeline(NULL), bus(NULL), strPipeline(strPipeline){
 		GError *error = NULL;
@@ -47,7 +51,7 @@ public:
 		if(pipeline == NULL) {
 			throw pipeline_failed(error->message);
 		}
-		this->bus = gst_element_get_bus(pipeline);
+		this->bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
 	}
 
 	GstBus* getBus() {
@@ -103,36 +107,47 @@ public:
 		this->join();
 	}
 
-	void play(bool waitForAsyncDone) {
+	void setXVtarget(GtkWidget* window) {
+		this->window = window;
+	}
+	void play() {
 		GstMessage *msg;
-		gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
 		msgThread = std::thread([=](){
 			LOG(DEBUG) << "Message thread started";
-			GstMessage* m = gst_bus_poll(this->bus, (GstMessageType)(GST_MESSAGE_ERROR | GST_MESSAGE_EOS), -1);
-
+			GstMessage* m;
 			GError *err = NULL;
 			gchar *dbg = NULL;
 
+			while(true) {
+				m = gst_bus_poll(this->bus, (GstMessageType)(GST_MESSAGE_ERROR | GST_MESSAGE_EOS | GST_MESSAGE_ELEMENT), -1);
+				switch (GST_MESSAGE_TYPE(m)) {
+				case GST_MESSAGE_EOS:
+					goto error;
+					break;
 
-			switch (GST_MESSAGE_TYPE(m)) {
-			case GST_MESSAGE_EOS:
-				break;
+				case GST_MESSAGE_ERROR:
+					gst_message_parse_error(m, &err, &dbg);
+					if (err) {
+						LOG(ERROR) << "Pipeline error: " << err->message;
+						g_error_free(err);
+					}
+					if (dbg) {
+						LOG(DEBUG) << "Pipeline debug details: " << dbg;
+						g_free(dbg);
+					}
+					goto error;
+					break;
+				case GST_MESSAGE_ELEMENT:
+					// ignore anything but 'prepare-xwindow-id' element messages
+					if (window != NULL && GST_MESSAGE_TYPE(m) == GST_MESSAGE_ELEMENT && gst_structure_has_name(m->structure, "prepare-xwindow-id"))
+						gst_x_overlay_set_xwindow_id(GST_X_OVERLAY(GST_MESSAGE_SRC(m)), GDK_WINDOW_XWINDOW(window->window)); // FIXME: see https://bugzilla.gnome.org/show_bug.cgi?id=599885
 
-			case GST_MESSAGE_ERROR:
-				gst_message_parse_error(m, &err, &dbg);
-				if (err) {
-					LOG(ERROR) << "Pipeline error: " << err->message;
-					g_error_free(err);
+					gst_message_unref(m);
+					break;
 				}
-				if (dbg) {
-					LOG(DEBUG) << "Pipeline debug details: " << dbg;
-					g_free(dbg);
-				}
-
-				break;
 			}
-
+			error:
 			gst_message_unref(m);
 			gst_element_set_state(pipeline, GST_STATE_NULL);
 			gst_object_unref(pipeline);
@@ -140,11 +155,9 @@ public:
 			LOG(INFO) << "Pipeline stopped";
 			LOG(DEBUG) << "Message thread stopped";
 		});
-
-		// wait for the pipeline to preroll
-		if(waitForAsyncDone)
-			msg = gst_bus_poll(bus, GST_MESSAGE_ASYNC_DONE, -1);
-
+		gst_element_set_state(pipeline, GST_STATE_PLAYING);
+		msg = gst_bus_poll(bus, GST_MESSAGE_ASYNC_DONE, -1);
+		gst_message_unref(msg);
 		LOG(INFO) << "Pipeline playing";
 	}
 };

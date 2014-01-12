@@ -20,9 +20,8 @@ using std::string;
 
 struct ClientTemplates {
 	string rtpBin = "gstrtpbin name=rtpbin";
-	string videoSource = "ximagesrc show-pointer=false";
+	string videoSource = "ximagesrc name=vpsrc";
 	string colospaceConvert = "ffmpegcolorspace";
-	string encoderString;
 	string videoSink =
 			"rtpbin.send_rtp_sink_0 rtpbin.send_rtp_src_0 ! udpsink name=vpsink";
 	string videoControlSink = "rtpbin.send_rtcp_src_0 ! udpsink name=vcsink";
@@ -38,9 +37,8 @@ struct ClientTemplates {
 struct ServerTemplates {
 	string rtpBin = "gstrtpbin name=rtpbin";
 	string videoSource = "udpsrc name=vpsrc ! rtpbin.recv_rtp_sink_0 rtpbin.";
-	string decoderString;
 	string colospaceConvert = "ffmpegcolorspace";
-	string videoSink = "xvimagesink force-aspect-ratio=TRUE";
+	string videoSink = "xvimagesink name=vpsink";
 	string videoControlSource = "udpsrc name=vcsrc ! rtpbin.recv_rtcp_sink_0";
 	string videoControlSink = "rtpbin.send_rtcp_src_0 ! udpsink name=vcsink";
 	string audioPipelineString =
@@ -54,7 +52,7 @@ class RTPPipelineFactory {
 	ClientTemplates ct;
 	ServerTemplates st;
 public:
-	Pipeline* createClientPipeline(string monitorSource, string host, int basePort, Codec c) {
+	Pipeline* createClientPipeline(string monitorSource, string host, int basePort, Codec c, bool showPointer) {
 		string strPipeline = ct.rtpBin + " "
 				+ ct.videoSource + " ! " + ct.colospaceConvert + " ! " + c.encoderString + " ! " + ct.videoSink + " "
 				+ ct.videoControlSink + " "
@@ -78,6 +76,7 @@ public:
 
 		pipeline->set("vcsrc", "port", basePort + 1);
 		pipeline->set("acsrc", "port", basePort + 2);
+		pipeline->set("vpsrc", "show-pointer", showPointer);
 
 		pipeline->set("acfilter", "caps", gst_caps_from_string(OPUS.rtpCaps.c_str()));
 		return pipeline;
@@ -104,6 +103,8 @@ public:
 		pipeline->set("acsink", "host", info.peerAddress);
 		pipeline->set("vcsink", "port", basePort + 1);
 		pipeline->set("acsink", "port", basePort + 2);
+		pipeline->set("vpsink", "force-aspect-ratio", true);
+
 		return pipeline;
 	}
 
