@@ -110,6 +110,7 @@ public:
 	void setXVtarget(GtkWidget* window) {
 		this->window = window;
 	}
+
 	void play() {
 		GstMessage *msg;
 
@@ -133,14 +134,14 @@ public:
 						g_error_free(err);
 					}
 					if (dbg) {
-						LOG(DEBUG) << "Pipeline debug details: " << dbg;
+						LOG(ERROR) << "Pipeline debug details: " << dbg;
 						g_free(dbg);
 					}
 					goto error;
 					break;
 				case GST_MESSAGE_ELEMENT:
 					// ignore anything but 'prepare-xwindow-id' element messages
-					if (window != NULL && GST_MESSAGE_TYPE(m) == GST_MESSAGE_ELEMENT && gst_structure_has_name(m->structure, "prepare-xwindow-id"))
+					if (window != NULL && gst_structure_has_name(m->structure, "prepare-xwindow-id"))
 						gst_x_overlay_set_xwindow_id(GST_X_OVERLAY(GST_MESSAGE_SRC(m)), GDK_WINDOW_XWINDOW(window->window)); // FIXME: see https://bugzilla.gnome.org/show_bug.cgi?id=599885
 
 					gst_message_unref(m);
