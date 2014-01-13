@@ -1,0 +1,30 @@
+pkgname=breezy-git
+pkgver=0.0.0
+pkgrel=1
+pkgdesc="Simple audio streaming tool"
+arch=('x86_64' 'i686')
+url="https://github.com/kallaballa/Breezy"
+license=('GPLv3')
+depends=('gstreamer0.10' 'gstreamer0.10-base-plugins' 'libpulse')
+optdepends=('pulseaudio')
+makedepends=('git')
+conflicts=('breezy')
+provides=('breezy')
+source=("$pkgname"::'git://github.com/kallaballa/Breezy.git')
+md5sums=('SKIP')
+ 
+pkgver() {
+  cd "$srcdir/$pkgname"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+ 
+build() {
+  cd "$srcdir/$pkgname"
+  make
+}
+ 
+package() {
+  cd "$srcdir/$pkgname"
+  make DESTDIR="$pkgdir" install
+}
+

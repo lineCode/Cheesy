@@ -1,0 +1,13 @@
+Source: cheesy
+Section: misc
+Priority: optional
+Maintainer: Amir Hassan <amir@viel-zu.org>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.8.4
+Homepage: http://github.com/kallaballa/Cheesy
+
+Package: cheesy
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libgtk2.0-0, libgstreamer0.10-0, gstreamer0.10-ffmpeg, gstreamer0.10-alsa,  gstreamer0.10-plugins-base, libboost-system1.49.0,  gstreamer0.10-plugins-base, gstreamer0.10-plugins-bad, gstreamer0.10-plugins-good, libpulse0
+Description: Simple desktop casting tool
+ Stream local desktop to a remote machine
