@@ -77,8 +77,6 @@ void printUsage() {
 void configureLogger() {
 	el::Configurations defaultConf;
 	defaultConf.setToDefault();
-	// Values are always std::string
-
 
 	defaultConf.set(el::Level::Info, el::ConfigurationType::Format,
 			"%datetime %msg");
@@ -191,7 +189,6 @@ int main(int argc, char *argv[]) {
 			}
 
 			pipeline = factory.createServerPipeline(daemonPort, ci);
-			//gst_bus_add_watch(pipeline->getBus(), (GstBusFunc) bus_call, window);
 			pipeline->setXVtarget(window);
 			pipeline->play();
 		}
