@@ -255,7 +255,6 @@ namespace cheesy {
 int main(int argc, char *argv[]) {
 	using std::string;
 	gst_init(0, NULL);
-	gtk_init(0, NULL);
 
 	_START_EASYLOGGINGPP(argc, argv);
 	configureLogger();
@@ -335,6 +334,8 @@ int main(int argc, char *argv[]) {
 
 	if(vm.count("disable-video"))
 		videoCodecName = EMPTY_CAPS.codec.name;
+	else
+		gtk_init(0, NULL);
 
 	if(vm.count("disable-sound"))
 		audioCodecName = EMPTY_CAPS.codec.name;
