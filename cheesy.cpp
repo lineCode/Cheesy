@@ -152,19 +152,21 @@ namespace cheesy {
 		}
 
 		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableSound) {
-			if(!checkXvExtension())
-				factory.getServerTemplates().videoSink="ximagesink name=vpsink";
+			if(!disableVideo) {
+				if(!checkXvExtension())
+					factory.getServerTemplates().videoSink="ximagesink name=vpsink";
 
-			CapsServer server(daemonPort);
-			gulong windowID;
+				gulong windowID;
 
-			if(!drawIntoRoot) {
-				GtkWidget* gtkWin = makeGtkWindow(fullscreen);
-				windowID = GDK_WINDOW_XWINDOW(gtkWin->window);
-			} else {
-				Display* dis = XOpenDisplay(NULL);
-				windowID = RootWindow(dis,0);
+				if(!drawIntoRoot) {
+					GtkWidget* gtkWin = makeGtkWindow(fullscreen);
+					windowID = GDK_WINDOW_XWINDOW(gtkWin->window);
+				} else {
+					Display* dis = XOpenDisplay(NULL);
+					windowID = RootWindow(dis,0);
+				}
 			}
+			CapsServer server(daemonPort);
 
 			while (true) {
 				LOG(INFO) << "Waiting for incoming connection";
