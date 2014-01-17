@@ -1,17 +1,17 @@
 pkgname=breezy-git
-pkgver=0.0.0
+pkgver=1.0
 pkgrel=1
-pkgdesc="Simple audio streaming tool"
+pkgdesc="Simple desktop streaming tool"
 arch=('x86_64' 'i686')
-url="https://github.com/kallaballa/Breezy"
+url="https://github.com/kallaballa/Cheesy"
 license=('GPLv3')
-depends=('gstreamer0.10' 'gstreamer0.10-base-plugins' 'libpulse')
+depends=('gstreamer0.10' 'gstreamer0.10-base-plugins' 'gstreamer0.10-good-plugins' 'gstreamer0.10-ugly-plugins' 'gstreamer0.10-bad-plugins' 'libpulse')
 optdepends=('pulseaudio')
 makedepends=('git')
-conflicts=('breezy')
-provides=('breezy')
-source=("$pkgname"::'git://github.com/kallaballa/Breezy.git')
-md5sums=('SKIP')
+conflicts=('cheesy')
+provides=('cheesy')
+source=('cheesy-1.0.tar.gz')
+md5sums=('ac4a21694c4b2ddbce777fbfbbaa97c8')
  
 pkgver() {
   cd "$srcdir/$pkgname"
