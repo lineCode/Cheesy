@@ -4,7 +4,7 @@
 #include "CapsServer.hpp"
 #include "Caps.hpp"
 #include <iostream>
-#include <getopt.h>
+#include <assert.h>
 #include <gst/gst.h>
 #include <vector>
 #include <string>
@@ -13,6 +13,12 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include "easylogging++.h"
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/extensions/Xvlib.h>
+#include <boost/program_options.hpp>
+
+namespace po = boost::program_options;
 
 _INITIALIZE_EASYLOGGINGPP
 
@@ -59,19 +65,8 @@ void loadCodecs(std::string filename) {
 
 		result.clear();
 	}
-}
 
-void printUsage() {
-	std::cerr << "Usage: cheesy [-d][-v][-p <daemonPort>][-m <index>] <target>..." << std::endl;
-	std::cerr << "Options:" << std::endl;
-	std::cerr << "\t-d\t\tstart the cheesy daemon" << std::endl;
-	std::cerr << "\t-v\t\tgenerate verbose output" << std::endl;
-	std::cerr << "\t-p <port>\tport to listen/connect to" << std::endl;
-	std::cerr << "\t-m <index>\tindex of the monitor source" << std::endl;
-	std::cerr << "\t-y \tshow mouse pointer" << std::endl;
-	std::cerr << "\t-w \tenable fullscreen mode" << std::endl;
-	std::cerr << "\t-f <codecsFile>\tuse given codecs file" << std::endl;
-	std::cerr << "\t-c <codecsName>\tuse given codec profile" << std::endl;
+	cheesy::Codec::setCodec(cheesy::EMPTY_CAPS.codec.name, cheesy::EMPTY_CAPS.codec);
 }
 
 void configureLogger() {
@@ -93,128 +88,156 @@ void configureLogger() {
 	el::Loggers::reconfigureLogger("default", defaultConf);
 }
 
-static void make_window_black(GtkWidget *window)
-{
-    GdkColor color;
-    gdk_color_parse("black", &color);
-    gtk_widget_modify_bg(window, GTK_STATE_NORMAL, &color);
+static gboolean delete_event( GtkWidget *widget, GdkEvent  *event, gpointer   data ) {
+    LOG(INFO) << "Window closed by user: " << (char *)data;
+    exit(0);
+    return FALSE;
 }
 
-int main(int argc, char *argv[]) {
-	gst_init(0, NULL);
-	gtk_init(0, NULL);
+bool checkXvExtension() {
+	Display *dpy;
+	unsigned int ver, rev, eventB, reqB, errorB;
 
-	_START_EASYLOGGINGPP(argc, argv);
-	configureLogger();
-	int c;
-	int daemonPort = 1111;
-	int monitorSourceIndex = 0;
-	bool verbose = false;
-	bool daemon = false;
-	std::string codecsFile = "/etc/cheesy/codecs";
-	std::string codecName = "MPEG4_HIGH";
-	bool showPointer = false;
-	bool fullscreen = false;
+	if (!(dpy = XOpenDisplay(NULL))) {
+		LOG(ERROR)<< "Can't open display";
+		return false;
+	}
 
-	while ((c = getopt(argc, argv, "wydvh?p:m:f:c:")) != -1) {
-		switch (c) {
-		case 'w':
-			fullscreen = true;
-			break;
-		case 'd':
-			daemon = true;
-			break;
-		case 'y':
-			showPointer = true;
-			break;
-		case 'v':
-			verbose = true;
-			break;
-		case 'p':
-			daemonPort = atoi(optarg);
-			break;
-		case 'f':
-			codecsFile = optarg;
-			break;
-		case 'c':
-			codecName = optarg;
-			break;
-		case 'm':
-			monitorSourceIndex = atoi(optarg);
-			break;
-		case 'h':
-			printUsage();
-			return 1;
-			break;
-		case ':':
-			printUsage();
-			return 1;
-			break;
-		case '?':
-			printUsage();
-			return 1;
-			break;
+	if ((Success != XvQueryExtension(dpy, &ver, &rev, &reqB, &eventB, &errorB))) {
+		LOG(INFO)<< "You don't have XVideo extension";
+		return false;
+	}
+
+    unsigned int nadaptors;
+    XvAdaptorInfo *ainfo;
+	XvQueryAdaptors(dpy, RootWindow(dpy, 0), &nadaptors, &ainfo);
+
+    if(nadaptors == 0) {
+    	LOG(INFO)<< "XVideo disabled";
+        return false;
+
+    }
+
+	LOG(INFO)<< "XVideo extension found";
+
+	return true;
+}
+
+GtkWidget* makeGtkWindow(bool fullscreen) {
+	if(fullscreen)
+		LOG(DEBUG) << "Creating fullscreen GTK window";
+	else
+		LOG(DEBUG) << "Creating GTK window";
+
+	GtkWidget* window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+	//explicit cast to suppress warning
+	char* cbname = (char*)"delete_event";
+	g_signal_connect (G_OBJECT (window), cbname, G_CALLBACK (delete_event), cbname);
+	if(fullscreen)
+		gtk_window_fullscreen(GTK_WINDOW(window));
+	GdkColor color;
+	gdk_color_parse("black", &color);
+	gtk_widget_modify_bg(window, GTK_STATE_NORMAL, &color);
+	gtk_widget_show_all(window);
+	return window;
+}
+
+namespace cheesy {
+	class Cheesy {
+		Pipeline* pipeline = NULL;
+		RTPPipelineFactory factory;
+
+	public:
+		Cheesy() {
 		}
-	}
-	using namespace cheesy;
 
-	loadCodecs(codecsFile);
+		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableSound) {
+			if(!checkXvExtension())
+				factory.getServerTemplates().videoSink="ximagesink name=vpsink";
 
-	if (verbose) {
-		gst_debug_set_default_threshold(GST_LEVEL_TRACE);
-	}
-	else {
-		gst_debug_set_default_threshold(GST_LEVEL_NONE);
-	}
+			CapsServer server(daemonPort);
+			gulong windowID;
 
-	Pipeline* pipeline = NULL;
-	RTPPipelineFactory factory;
-
-	if (daemon) {
-		CapsServer server(daemonPort);
-		GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-		if(fullscreen)
-			gtk_window_fullscreen(GTK_WINDOW(window));
-		make_window_black(window);
-		gtk_widget_show_all(window);
-
-		while (true) {
-			LOG(INFO) << "Waiting for incoming connection";
-			ConnectionInfo ci = server.accept();
-			LOG(INFO) << "Accepted connection: " << ci.peerAddress;
-
-			if (pipeline != NULL && pipeline->isRunning()) {
-				pipeline->stop();
-				delete pipeline;
+			if(!drawIntoRoot) {
+				GtkWidget* gtkWin = makeGtkWindow(fullscreen);
+				windowID = GDK_WINDOW_XWINDOW(gtkWin->window);
+			} else {
+				Display* dis = XOpenDisplay(NULL);
+				windowID = RootWindow(dis,0);
 			}
 
-			pipeline = factory.createServerPipeline(daemonPort, ci);
-			pipeline->setXVtarget(window);
-			pipeline->play();
+			while (true) {
+				LOG(INFO) << "Waiting for incoming connection";
+				ClientInfo ci = server.accept(disableVideo, disableSound);
+				LOG(INFO) << "Accepted connection: " << ci.peerAddress;
+
+				if (pipeline != NULL && pipeline->isRunning()) {
+					pipeline->stop();
+					delete pipeline;
+				}
+
+				pipeline = factory.createServerPipeline(daemonPort, ci);
+
+				pipeline->setXwindowID(windowID);
+				pipeline->play(false);
+			}
 		}
-	} else if ((argc - optind) == 1) {
-		auto monitors = getPulseMonitorSource();
 
-		if (monitors.size() > monitorSourceIndex) {
-			string host =  argv[optind];
-			LOG(INFO) << "Selected monitor source: " << monitors[monitorSourceIndex];
+		void startClient(string host, int daemonPort, string videoCodecName, string soundCodecName, string monitorSource, bool showPointer, signed long xid) {
+			//setting the xid after the pipeline ist created doesn't work so just inject it into the client templates
+			if(xid != -1)
+				factory.getClientTemplates().videoSource = "ximagesrc name=vpsrc xid=" + std::to_string(xid);
 
-			cheesy::RTPPipelineFactory f;
-			Pipeline* pipeline = f.createClientPipeline(monitors[monitorSourceIndex], host, daemonPort, Codec::getCodec(codecName),showPointer);
+			Pipeline* pipeline = factory.createClientPipeline(monitorSource, host, daemonPort, Codec::getCodec(videoCodecName), Codec::getCodec(soundCodecName) ,showPointer);
+
 			pipeline->play();
+			std::string videoRtpCaps = EMPTY_CAPS.rtpCaps;
+			std::string soundRtpCaps = EMPTY_CAPS.rtpCaps;
+			bool disableVideo = videoCodecName == EMPTY_CAPS.codec.name;
+			bool disableSound = soundCodecName == EMPTY_CAPS.codec.name;
+			assert(!(disableVideo && disableSound));
 
-			std::string rtpCaps = pipeline->getPadCaps("vpsink","sink");
+			if(!disableVideo){
+				videoRtpCaps = pipeline->getPadCaps("vpsink","sink");
+			}
+
+			if(!disableSound){
+				soundRtpCaps = pipeline->getPadCaps("apsink","sink");
+			}
+
 			CapsClient client;
 			try {
 				client.connect(host, daemonPort);
-				LOG(DEBUG) << "Announcing caps. Codec: " << codecName << " rtp-caps: " << rtpCaps;
-				client.announce({ rtpCaps, Codec::getCodec(codecName)});
+				LOG(DEBUG) << "video codec: " << videoCodecName;
+				LOG(DEBUG) << "video rtp-caps: " << videoRtpCaps;
+				LOG(DEBUG) << "sound codec: " << soundCodecName;
+				LOG(DEBUG) << "sound rtp-caps: " << soundRtpCaps;
+
+				ServerInfo sopt = client.announce({ videoRtpCaps, Codec::getCodec(videoCodecName)}, { soundRtpCaps, Codec::getCodec(soundCodecName)});
+
+				bool reconnect = false;
+				if(!disableVideo && !sopt.hasVideo) {
+					LOG(INFO) << "Server doesn't support video";
+					videoCodecName = EMPTY_CAPS.codec.name;
+					reconnect = true;
+				}
+
+				if(!disableSound && !sopt.hasSound) {
+					LOG(INFO) << "Server doesn't support sound";
+					soundCodecName = EMPTY_CAPS.codec.name;
+					reconnect = true;
+				}
+
+				if(reconnect) {
+					LOG(INFO) << "Reconnecting";
+					client.close();
+					pipeline->stop();
+					startClient(host, daemonPort, videoCodecName, soundCodecName, monitorSource, showPointer, xid);
+				}
 			} catch(std::exception& ex) {
 				LOG(ERROR) << "Can't connect to host: " << ex.what();
-				return 1;
 			}
 
-			//pipeline->join();
 			try {
 				client.join();
 			} catch(std::exception& ex) {
@@ -222,9 +245,123 @@ int main(int argc, char *argv[]) {
 			}
 
 			pipeline->stop();
-			return 0;
+		}
+	};
+}
+
+int main(int argc, char *argv[]) {
+	using std::string;
+	gst_init(0, NULL);
+	gtk_init(0, NULL);
+
+	_START_EASYLOGGINGPP(argc, argv);
+	configureLogger();
+	int port;
+	int monitorSourceIndex;
+	std::string codecsFile;
+	std::string videoCodecName;
+	std::string audioCodecName = "OPUS";
+	signed long xid = -1;
+
+	po::options_description genericDesc("Generic options");
+	genericDesc.add_options()
+		("help,h", "produce help message")
+		("verbose,v", "enable verbose output");
+
+    po::options_description bothDesc("Options for both daemon and client");
+    bothDesc.add_options()
+        ("port", po::value<int>(&port)->default_value(11111), "port number to use")
+        ("disable-sound,s", "disable sound")
+		("disable-video,p", "disable video")
+    	("codecs-file,f", po::value<string>(&codecsFile)->default_value("/etc/cheesy/codecs"), "use given codecs file");
+
+    po::options_description clientDesc("Client options");
+    clientDesc.add_options()
+		("show-pointer,y", "show the mouse pointer")
+		("xid,x", po::value<signed long>(&xid), "capture from this window")
+		("video-codec,n", po::value<string>(&videoCodecName)->default_value("MPEG4_HIGH"), "use given video codec profile")
+		//("audio-codec,a", po::value<string>(&audioCodecName)->default_value("OPUS"), "use given audio codec profile")
+		("monitor,m", po::value<int>(&monitorSourceIndex)->default_value(0), "use given pulse monitor source index");
+
+    po::options_description daemonDesc("Daemon options");
+    daemonDesc.add_options()
+		("daemon,d", "run as a daemon")
+		("fullscreen,w", "run in fullscreen mode")
+		("root,r", "draw into the root window");
+
+    po::options_description hidden("Hidden options");
+    hidden.add_options()
+    	("ip-address", po::value< string >(), "The target ip-address");
+
+    po::positional_options_description p;
+    p.add("ip-address", -1);
+
+
+    po::options_description cmdline_options;
+    cmdline_options.add(genericDesc).add(bothDesc).add(clientDesc).add(daemonDesc).add(hidden);
+
+    po::options_description visible("Allowed options");
+    visible.add(genericDesc).add(bothDesc).add(clientDesc).add(daemonDesc);
+
+    po::variables_map vm;
+    po::store(po::command_line_parser(argc, argv).options(cmdline_options).positional(p).run(), vm);
+    po::notify(vm);
+
+    if (vm.count("help")) {
+        std::cerr << "Usage: cheesy [options] [ip-address]\n";
+        std::cerr << visible;
+        return 0;
+    }
+
+    using namespace cheesy;
+
+	loadCodecs(codecsFile);
+
+	if (vm.count("verbose")) {
+		gst_debug_set_default_threshold(GST_LEVEL_TRACE);
+	}
+	else {
+		gst_debug_set_default_threshold(GST_LEVEL_NONE);
+	}
+
+	Cheesy cheesy;
+
+	if(vm.count("disable-video") && vm.count("disable-sound")) {
+		std::cerr << "disabling video and audio at the same time doesn't do anything" << std::endl;
+	}
+
+	if(vm.count("disable-video"))
+		videoCodecName = EMPTY_CAPS.codec.name;
+
+	if(vm.count("disable-sound"))
+		audioCodecName = EMPTY_CAPS.codec.name;
+
+	if (vm.count("daemon")) {
+		cheesy.startDaemon(port, vm.count("fullscreen"), vm.count("root"), vm.count("disable-video"), vm.count("disable-sound"));
+	} else if (vm.count("ip-address")) {
+		std::vector<string> monitors;
+
+		if(vm.count("disable-sound")) {
+			monitors.push_back("none");
+			monitorSourceIndex = 0;
+		}
+		else
+			monitors = getPulseMonitorSource();
+
+		if (monitors.size() > monitorSourceIndex) {
+			string host =  vm["ip-address"].as< string >();
+			string monitorSource =  monitors[monitorSourceIndex];
+			LOG(INFO) << "Selected monitor source: " << monitorSource;
+
+			cheesy.startClient(host, port, videoCodecName, audioCodecName, monitorSource, vm.count("show-pointer"), xid);
 		} else {
 			LOG(FATAL) << "Monitor source not found";
+			return 1;
 		}
+		return 0;
+	} else {
+        std::cerr << "Usage: cheesy [options] [ip-address]\n";
+        std::cerr << visible;
+        return 0;
 	}
 }

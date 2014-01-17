@@ -24,7 +24,7 @@ public:
 	virtual ~CapsServer();
 
 	void close();
-	ConnectionInfo accept();
+	ClientInfo accept(bool disableVideo, bool disableSound);
 };
 
 } /* namespace cheesy */

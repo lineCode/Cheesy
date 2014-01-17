@@ -14,6 +14,11 @@
 
 namespace cheesy {
 
+struct ServerInfo {
+	bool hasVideo = true;
+	bool hasSound = true;
+};
+
 class CapsClient {
     boost::asio::io_service io_service;
     boost::asio::ip::tcp::socket socket;
@@ -21,8 +26,9 @@ public:
 	CapsClient();
 	virtual ~CapsClient();
 	void connect(std::string host, int port);
-	void announce(Caps caps);
+	ServerInfo announce(Caps videoCaps, Caps audioCaps);
 	void join();
+	void close();
 };
 
 } /* namespace cheesy */

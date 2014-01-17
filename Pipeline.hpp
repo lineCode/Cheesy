@@ -43,7 +43,8 @@ class Pipeline {
 	std::thread msgThread;
 	GstBus* bus;
 	string strPipeline;
-	GtkWidget* window = NULL;
+	gulong window_id;
+	bool windowSet = false;
 public:
 	Pipeline(string strPipeline) : pipeline(NULL), bus(NULL), strPipeline(strPipeline){
 		GError *error = NULL;
@@ -107,11 +108,12 @@ public:
 		this->join();
 	}
 
-	void setXVtarget(GtkWidget* window) {
-		this->window = window;
+	void setXwindowID(gulong xwindow_id) {
+		this->window_id = xwindow_id;
+		windowSet = true;
 	}
 
-	void play() {
+	void play(bool waitForAsyncDone = true) {
 		GstMessage *msg;
 
 		msgThread = std::thread([=](){
@@ -141,9 +143,10 @@ public:
 					break;
 				case GST_MESSAGE_ELEMENT:
 					// ignore anything but 'prepare-xwindow-id' element messages
-					if (window != NULL && gst_structure_has_name(m->structure, "prepare-xwindow-id"))
-						gst_x_overlay_set_xwindow_id(GST_X_OVERLAY(GST_MESSAGE_SRC(m)), GDK_WINDOW_XWINDOW(window->window)); // FIXME: see https://bugzilla.gnome.org/show_bug.cgi?id=599885
-
+					if (windowSet && gst_structure_has_name(m->structure, "prepare-xwindow-id")) {
+						gst_x_overlay_set_xwindow_id(GST_X_OVERLAY(GST_MESSAGE_SRC(m)), this->window_id); // FIXME: see https://bugzilla.gnome.org/show_bug.cgi?id=599885
+						LOG(DEBUG) << "Enabled X overlay";
+					}
 					gst_message_unref(m);
 					break;
 				}
@@ -157,8 +160,10 @@ public:
 			LOG(DEBUG) << "Message thread stopped";
 		});
 		gst_element_set_state(pipeline, GST_STATE_PLAYING);
-		msg = gst_bus_poll(bus, GST_MESSAGE_ASYNC_DONE, -1);
-		gst_message_unref(msg);
+		if(waitForAsyncDone){
+			msg = gst_bus_poll(bus, GST_MESSAGE_ASYNC_DONE, -1);
+			gst_message_unref(msg);
+		}
 		LOG(INFO) << "Pipeline playing";
 	}
 };

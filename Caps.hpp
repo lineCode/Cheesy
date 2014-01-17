@@ -24,6 +24,8 @@ public:
 	string decoderString;
 
 	static Codec getCodec(string name) {
+		if(name == "NONE")
+			return {"NONE", "NONE", "NONE"};
 		return codecMap[name];
 	}
 
@@ -39,9 +41,15 @@ public:
 	Codec codec;
 };
 
+
 static Caps OPUS = {
 		"application/x-rtp, media=(string)audio, payload=(int)96, clock-rate=(int)48000, encoding-name=(string)X-GST-OPUS-DRAFT-SPITTKA-00, encoding-params=(string)1",
 		{"OPUS", "opusenc ! rtpopuspay", "rtoopusdepay ! opusdec"}
+};
+
+static Caps EMPTY_CAPS {
+		"NONE",
+		{"NONE", "NONE", "NONE"}
 };
 
 } /* namespace cheesy */

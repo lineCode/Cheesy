@@ -12,10 +12,11 @@
 #include <string>
 
 namespace cheesy {
-struct ConnectionInfo {
-	std::string peerAddress;
-	Caps caps;
-};
+	struct ClientInfo {
+		std::string peerAddress;
+		Caps videoCaps;
+		Caps audioCaps;
+	};
 }
 
 #endif /* CONNECTIONINFO_HPP_ */

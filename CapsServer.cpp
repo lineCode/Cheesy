@@ -9,6 +9,7 @@
 #include "CapsServer.hpp"
 #include "Caps.hpp"
 #include "ConnectionInfo.hpp"
+#include <assert.h>
 
 namespace cheesy {
 
@@ -33,7 +34,8 @@ void CapsServer::close() {
 		socket->close();
 }
 
-ConnectionInfo CapsServer::accept() {
+ClientInfo CapsServer::accept(bool disableVideo, bool disableSound) {
+	assert(!(disableVideo && disableSound));
 	acceptor.listen();
 	boost::asio::ip::tcp::socket* s = new boost::asio::ip::tcp::socket(io_service);
 	acceptor.accept(*s);
@@ -52,12 +54,42 @@ ConnectionInfo CapsServer::accept() {
 
 	// Check that response is OK.
 	std::istream response_stream(&response);
-	std::string codecName;
-	std::string rtpCaps;
+	std::string videoCodecName;
+	std::string rtpVideoCaps;
+	std::string audioCodecName;
+	std::string rtpAudioCaps;
+	Caps videoCaps;
+	Caps audioCaps;
 
-	std::getline(response_stream, codecName);
-	std::getline(response_stream, rtpCaps);
+	std::getline(response_stream, videoCodecName);
+	std::getline(response_stream, rtpVideoCaps);
+	std::getline(response_stream, audioCodecName);
+	std::getline(response_stream, rtpAudioCaps);
 
-	return {peerAddr,{rtpCaps, Codec::getCodec(codecName)}};
+	//FIXME make sending rtp audio caps work
+	rtpAudioCaps = OPUS.rtpCaps;
+	if(disableVideo || videoCodecName == EMPTY_CAPS.codec.name)
+		videoCaps = EMPTY_CAPS;
+	else
+		videoCaps = {rtpVideoCaps, Codec::getCodec(videoCodecName)};
+
+	if(disableSound || audioCodecName == EMPTY_CAPS.codec.name)
+		audioCaps = EMPTY_CAPS;
+	else
+		audioCaps = {rtpAudioCaps, Codec::getCodec(audioCodecName)};
+
+	boost::asio::streambuf request;
+    std::ostream request_stream(&request);
+
+	if(disableVideo) {
+		request_stream << "disable-video" << '\n';
+	} else if(disableSound) {
+		request_stream << "disable-sound" << '\n';
+	} else {
+		request_stream << "ok" << '\n';
+	}
+    boost::asio::write(*socket, request);
+
+	return {peerAddr, videoCaps, audioCaps};
 }
 } /* namespace cheesy */
