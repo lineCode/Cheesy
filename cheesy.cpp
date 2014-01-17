@@ -152,11 +152,11 @@ namespace cheesy {
 		}
 
 		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableSound) {
+			gulong windowID;
+
 			if(!disableVideo) {
 				if(!checkXvExtension())
 					factory.getServerTemplates().videoSink="ximagesink name=vpsink";
-
-				gulong windowID;
 
 				if(!drawIntoRoot) {
 					GtkWidget* gtkWin = makeGtkWindow(fullscreen);
@@ -180,7 +180,8 @@ namespace cheesy {
 
 				pipeline = factory.createServerPipeline(daemonPort, ci);
 
-				pipeline->setXwindowID(windowID);
+				if(!disableVideo)
+					pipeline->setXwindowID(windowID);
 				pipeline->play(false);
 			}
 		}
