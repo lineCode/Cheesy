@@ -6,7 +6,7 @@ Name: cheesy
 Prefix: /usr 
 %if %{defined fedora_version}
 BuildRequires: gcc-c++ gtk2-devel pulseaudio-libs-devel gstreamer-devel boost-devel gstreamer-plugins-base-devel libX11-devel libXv-devel
-Requires: libgtk-2_0-0 pulseaudio-libs gstreamer gstreamer-plugins-ffmpeg gstreamer-plugins-ugly gstreamer-plugins-base gstreamer-plugins-good gstreamer-plugins-base libXv1 libX11-6
+Requires: libgtk-2_0-0 pulseaudio-libs gstreamer gstreamer-plugins-ffmpeg gstreamer-plugins-ugly gstreamer-plugins-base gstreamer-plugins-good gstreamer-plugins-base libXv libX11
 %else
 BuildRequires: gcc-c++ gtk2-devel libpulse-devel gstreamer-0_10-devel boost-devel gstreamer-0_10-plugins-base-devel libX11-devel libXv-devel
 Requires: libgtk-2_0-0 libpulse0 libgstreamer-0_10-0 gstreamer-0_10-plugins-ffmpeg gstreamer-0_10-plugins-ugly  gstreamer-0_10-plugins-bad gstreamer-0_10-plugins-good gstreamer-0_10-plugins-base libXv1 libX11-6
