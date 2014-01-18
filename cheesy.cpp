@@ -151,21 +151,22 @@ namespace cheesy {
 		Cheesy() {
 		}
 
-		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableAudio) {
-			gulong windowID;
+		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableAudio, signed long xid) {
+			if(xid == -1) {
+				if(!disableVideo) {
+					if(!checkXvExtension())
+						factory.getServerTemplates().videoSink="ximagesink name=vpsink";
 
-			if(!disableVideo) {
-				if(!checkXvExtension())
-					factory.getServerTemplates().videoSink="ximagesink name=vpsink";
-
-				if(!drawIntoRoot) {
-					GtkWidget* gtkWin = makeGtkWindow(fullscreen);
-					windowID = GDK_WINDOW_XWINDOW(gtkWin->window);
-				} else {
-					Display* dis = XOpenDisplay(NULL);
-					windowID = RootWindow(dis,0);
+					if(!drawIntoRoot) {
+						GtkWidget* gtkWin = makeGtkWindow(fullscreen);
+						xid = GDK_WINDOW_XWINDOW(gtkWin->window);
+					} else {
+						Display* dis = XOpenDisplay(NULL);
+						xid = RootWindow(dis,0);
+					}
 				}
 			}
+
 			CapsServer server(daemonPort);
 
 			while (true) {
@@ -181,7 +182,7 @@ namespace cheesy {
 				pipeline = factory.createServerPipeline(daemonPort, ci);
 
 				if(!disableVideo)
-					pipeline->setXwindowID(windowID);
+					pipeline->setXwindowID(xid);
 				pipeline->play(false);
 			}
 		}
@@ -265,31 +266,28 @@ int main(int argc, char *argv[]) {
 	std::string audioCodecName = "OPUS";
 	signed long xid = -1;
 
-	po::options_description genericDesc("Generic options");
+	po::options_description genericDesc("Options for both daemon and client");
 	genericDesc.add_options()
-		("help,h", "produce help message")
-		("verbose,v", "enable verbose output");
-
-    po::options_description bothDesc("Options for both daemon and client");
-    bothDesc.add_options()
-        ("port", po::value<int>(&port)->default_value(11111), "port number to use")
-        ("disable-audio,s", "disable audio")
-		("disable-video,p", "disable video")
-    	("codecs-file,f", po::value<string>(&codecsFile)->default_value("/etc/cheesy/codecs"), "use given codecs file");
+		("help,h", "Produce help message")
+		("verbose,v", "Enable verbose output")
+		("port,p", po::value<int>(&port)->default_value(11111), "Port number to use")
+		("disable-audio,a", "Disable audio")
+		("disable-video,t", "Disable video")
+    	("codecs-file,f", po::value<string>(&codecsFile)->default_value("/etc/cheesy/codecs"), "Use given codecs file")
+		("xid,x", po::value<signed long>(&xid), "Capture from this window in client mode. If -d is supplied draw into this window.");
 
     po::options_description clientDesc("Client options");
     clientDesc.add_options()
-		("show-pointer,y", "show the mouse pointer")
-		("xid,x", po::value<signed long>(&xid), "capture from this window")
-		("video-codec,n", po::value<string>(&videoCodecName)->default_value("MPEG4_HIGH"), "use given video codec profile")
-		//("audio-codec,a", po::value<string>(&audioCodecName)->default_value("OPUS"), "use given audio codec profile")
-		("monitor,m", po::value<int>(&monitorSourceIndex)->default_value(0), "use given pulse monitor source index");
+		("show-pointer,y", "Show the mouse pointer")
+		("video-codec,r", po::value<string>(&videoCodecName)->default_value("MPEG4_HIGH"), "Use given video codec profile")
+		//("audio-codec,s", po::value<string>(&audioCodecName)->default_value("OPUS"), "use given audio codec profile")
+		("monitor,m", po::value<int>(&monitorSourceIndex)->default_value(0), "Use given pulse monitor source index");
 
     po::options_description daemonDesc("Daemon options");
     daemonDesc.add_options()
-		("daemon,d", "run as a daemon")
-		("fullscreen,w", "run in fullscreen mode")
-		("root,r", "draw into the root window");
+		("daemon,d", "Run as a daemon")
+		("fullscreen,w", "Run in fullscreen mode")
+		("root,r", "Draw into the root window");
 
     po::options_description hidden("Hidden options");
     hidden.add_options()
@@ -298,12 +296,11 @@ int main(int argc, char *argv[]) {
     po::positional_options_description p;
     p.add("ip-address", -1);
 
-
     po::options_description cmdline_options;
-    cmdline_options.add(genericDesc).add(bothDesc).add(clientDesc).add(daemonDesc).add(hidden);
+    cmdline_options.add(genericDesc).add(clientDesc).add(daemonDesc).add(hidden);
 
-    po::options_description visible("Allowed options");
-    visible.add(genericDesc).add(bothDesc).add(clientDesc).add(daemonDesc);
+    po::options_description visible;
+    visible.add(genericDesc).add(clientDesc).add(daemonDesc);
 
     po::variables_map vm;
     po::store(po::command_line_parser(argc, argv).options(cmdline_options).positional(p).run(), vm);
@@ -341,7 +338,7 @@ int main(int argc, char *argv[]) {
 		audioCodecName = EMPTY_CAPS.codec.name;
 
 	if (vm.count("daemon")) {
-		cheesy.startDaemon(port, vm.count("fullscreen"), vm.count("root"), vm.count("disable-video"), vm.count("disable-audio"));
+		cheesy.startDaemon(port, vm.count("fullscreen"), vm.count("root"), vm.count("disable-video"), vm.count("disable-audio"), xid);
 	} else if (vm.count("ip-address")) {
 		std::vector<string> monitors;
 
