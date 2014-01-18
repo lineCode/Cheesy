@@ -12,11 +12,11 @@
 #include <fstream>
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
-#include "easylogging++.h"
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/extensions/Xvlib.h>
 #include <boost/program_options.hpp>
+#include "easylogging++.h"
 
 namespace po = boost::program_options;
 
@@ -151,7 +151,7 @@ namespace cheesy {
 		Cheesy() {
 		}
 
-		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableSound) {
+		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableAudio) {
 			gulong windowID;
 
 			if(!disableVideo) {
@@ -170,7 +170,7 @@ namespace cheesy {
 
 			while (true) {
 				LOG(INFO) << "Waiting for incoming connection";
-				ClientInfo ci = server.accept(disableVideo, disableSound);
+				ClientInfo ci = server.accept(disableVideo, disableAudio);
 				LOG(INFO) << "Accepted connection: " << ci.peerAddress;
 
 				if (pipeline != NULL && pipeline->isRunning()) {
@@ -186,26 +186,26 @@ namespace cheesy {
 			}
 		}
 
-		void startClient(string host, int daemonPort, string videoCodecName, string soundCodecName, string monitorSource, bool showPointer, signed long xid) {
+		void startClient(string host, int daemonPort, string videoCodecName, string audioCodecName, string monitorSource, bool showPointer, signed long xid) {
 			//setting the xid after the pipeline ist created doesn't work so just inject it into the client templates
 			if(xid != -1)
 				factory.getClientTemplates().videoSource = "ximagesrc name=vpsrc xid=" + std::to_string(xid);
 
-			Pipeline* pipeline = factory.createClientPipeline(monitorSource, host, daemonPort, Codec::getCodec(videoCodecName), Codec::getCodec(soundCodecName) ,showPointer);
+			Pipeline* pipeline = factory.createClientPipeline(monitorSource, host, daemonPort, Codec::getCodec(videoCodecName), Codec::getCodec(audioCodecName) ,showPointer);
 
 			pipeline->play();
 			std::string videoRtpCaps = EMPTY_CAPS.rtpCaps;
-			std::string soundRtpCaps = EMPTY_CAPS.rtpCaps;
+			std::string audioRtpCaps = EMPTY_CAPS.rtpCaps;
 			bool disableVideo = videoCodecName == EMPTY_CAPS.codec.name;
-			bool disableSound = soundCodecName == EMPTY_CAPS.codec.name;
-			assert(!(disableVideo && disableSound));
+			bool disableAudio = audioCodecName == EMPTY_CAPS.codec.name;
+			assert(!(disableVideo && disableAudio));
 
 			if(!disableVideo){
 				videoRtpCaps = pipeline->getPadCaps("vpsink","sink");
 			}
 
-			if(!disableSound){
-				soundRtpCaps = pipeline->getPadCaps("apsink","sink");
+			if(!disableAudio){
+				audioRtpCaps = pipeline->getPadCaps("apsink","sink");
 			}
 
 			CapsClient client;
@@ -213,21 +213,21 @@ namespace cheesy {
 				client.connect(host, daemonPort);
 				LOG(DEBUG) << "video codec: " << videoCodecName;
 				LOG(DEBUG) << "video rtp-caps: " << videoRtpCaps;
-				LOG(DEBUG) << "sound codec: " << soundCodecName;
-				LOG(DEBUG) << "sound rtp-caps: " << soundRtpCaps;
+				LOG(DEBUG) << "audio codec: " << audioCodecName;
+				LOG(DEBUG) << "audio rtp-caps: " << audioRtpCaps;
 
-				ServerInfo sopt = client.announce({ videoRtpCaps, Codec::getCodec(videoCodecName)}, { soundRtpCaps, Codec::getCodec(soundCodecName)});
+				ServerInfo sinfo = client.announce({ videoRtpCaps, Codec::getCodec(videoCodecName)}, { audioRtpCaps, Codec::getCodec(audioCodecName)});
 
 				bool reconnect = false;
-				if(!disableVideo && !sopt.hasVideo) {
+				if(!disableVideo && !sinfo.hasVideo) {
 					LOG(INFO) << "Server doesn't support video";
 					videoCodecName = EMPTY_CAPS.codec.name;
 					reconnect = true;
 				}
 
-				if(!disableSound && !sopt.hasSound) {
-					LOG(INFO) << "Server doesn't support sound";
-					soundCodecName = EMPTY_CAPS.codec.name;
+				if(!disableAudio && !sinfo.hasAudio) {
+					LOG(INFO) << "Server doesn't support audio";
+					audioCodecName = EMPTY_CAPS.codec.name;
 					reconnect = true;
 				}
 
@@ -235,7 +235,7 @@ namespace cheesy {
 					LOG(INFO) << "Reconnecting";
 					client.close();
 					pipeline->stop();
-					startClient(host, daemonPort, videoCodecName, soundCodecName, monitorSource, showPointer, xid);
+					startClient(host, daemonPort, videoCodecName, audioCodecName, monitorSource, showPointer, xid);
 				}
 			} catch(std::exception& ex) {
 				LOG(ERROR) << "Can't connect to host: " << ex.what();
@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
     po::options_description bothDesc("Options for both daemon and client");
     bothDesc.add_options()
         ("port", po::value<int>(&port)->default_value(11111), "port number to use")
-        ("disable-sound,s", "disable sound")
+        ("disable-audio,s", "disable audio")
 		("disable-video,p", "disable video")
     	("codecs-file,f", po::value<string>(&codecsFile)->default_value("/etc/cheesy/codecs"), "use given codecs file");
 
@@ -328,7 +328,7 @@ int main(int argc, char *argv[]) {
 
 	Cheesy cheesy;
 
-	if(vm.count("disable-video") && vm.count("disable-sound")) {
+	if(vm.count("disable-video") && vm.count("disable-audio")) {
 		std::cerr << "disabling video and audio at the same time doesn't do anything" << std::endl;
 	}
 
@@ -337,15 +337,15 @@ int main(int argc, char *argv[]) {
 	else
 		gtk_init(0, NULL);
 
-	if(vm.count("disable-sound"))
+	if(vm.count("disable-audio"))
 		audioCodecName = EMPTY_CAPS.codec.name;
 
 	if (vm.count("daemon")) {
-		cheesy.startDaemon(port, vm.count("fullscreen"), vm.count("root"), vm.count("disable-video"), vm.count("disable-sound"));
+		cheesy.startDaemon(port, vm.count("fullscreen"), vm.count("root"), vm.count("disable-video"), vm.count("disable-audio"));
 	} else if (vm.count("ip-address")) {
 		std::vector<string> monitors;
 
-		if(vm.count("disable-sound")) {
+		if(vm.count("disable-audio")) {
 			monitors.push_back("none");
 			monitorSourceIndex = 0;
 		}

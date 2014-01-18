@@ -34,8 +34,8 @@ void CapsServer::close() {
 		socket->close();
 }
 
-ClientInfo CapsServer::accept(bool disableVideo, bool disableSound) {
-	assert(!(disableVideo && disableSound));
+ClientInfo CapsServer::accept(bool disableVideo, bool disableAudio) {
+	assert(!(disableVideo && disableAudio));
 	acceptor.listen();
 	boost::asio::ip::tcp::socket* s = new boost::asio::ip::tcp::socket(io_service);
 	acceptor.accept(*s);
@@ -73,7 +73,7 @@ ClientInfo CapsServer::accept(bool disableVideo, bool disableSound) {
 	else
 		videoCaps = {rtpVideoCaps, Codec::getCodec(videoCodecName)};
 
-	if(disableSound || audioCodecName == EMPTY_CAPS.codec.name)
+	if(disableAudio || audioCodecName == EMPTY_CAPS.codec.name)
 		audioCaps = EMPTY_CAPS;
 	else
 		audioCaps = {rtpAudioCaps, Codec::getCodec(audioCodecName)};
@@ -83,8 +83,8 @@ ClientInfo CapsServer::accept(bool disableVideo, bool disableSound) {
 
 	if(disableVideo) {
 		request_stream << "disable-video" << '\n';
-	} else if(disableSound) {
-		request_stream << "disable-sound" << '\n';
+	} else if(disableAudio) {
+		request_stream << "disable-audio" << '\n';
 	} else {
 		request_stream << "ok" << '\n';
 	}

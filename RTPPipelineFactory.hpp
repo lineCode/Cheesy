@@ -93,7 +93,7 @@ public:
 			pipeline->set("acsink", "port", basePort + 4);
 			pipeline->set("acsrc", "port", basePort + 2);
 		} else {
-			LOG(DEBUG)<< "Sound disabled";
+			LOG(DEBUG)<< "Audio disabled";
 		}
 
 		return pipeline;
@@ -138,7 +138,7 @@ public:
 			pipeline->set("acsink", "host", info.peerAddress);
 			pipeline->set("acsink", "port", basePort + 2);
 		} else {
-			LOG(DEBUG)<< "Sound disabled";
+			LOG(DEBUG)<< "Audio disabled";
 		}
 
 		return pipeline;

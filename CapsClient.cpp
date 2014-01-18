@@ -47,11 +47,11 @@ ServerInfo CapsClient::announce(Caps videoCaps, Caps audioCaps) {
 
 	std::getline(response_stream, strResponse);
 	soptions.hasVideo = true;
-	soptions.hasSound = true;
+	soptions.hasAudio = true;
 	if(strResponse == "disable-video")
 		soptions.hasVideo = false;
-	else if(strResponse == "disable-sound")
-		soptions.hasSound = false;
+	else if(strResponse == "disable-audio")
+		soptions.hasAudio = false;
 
 	LOG(DEBUG) << "Response: " + strResponse;
 	return soptions;

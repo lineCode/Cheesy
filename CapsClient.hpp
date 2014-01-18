@@ -16,7 +16,7 @@ namespace cheesy {
 
 struct ServerInfo {
 	bool hasVideo = true;
-	bool hasSound = true;
+	bool hasAudio = true;
 };
 
 class CapsClient {
