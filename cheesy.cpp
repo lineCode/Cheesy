@@ -168,7 +168,6 @@ namespace cheesy {
 			}
 
 			CapsServer server(daemonPort);
-
 			while (true) {
 				LOG(INFO) << "Waiting for incoming connection";
 				ClientInfo ci = server.accept(disableVideo, disableAudio);
@@ -212,40 +211,48 @@ namespace cheesy {
 			CapsClient client;
 			try {
 				client.connect(host, daemonPort);
-				LOG(DEBUG) << "video codec: " << videoCodecName;
-				LOG(DEBUG) << "video rtp-caps: " << videoRtpCaps;
-				LOG(DEBUG) << "audio codec: " << audioCodecName;
-				LOG(DEBUG) << "audio rtp-caps: " << audioRtpCaps;
-
-				ServerInfo sinfo = client.announce({ videoRtpCaps, Codec::getCodec(videoCodecName)}, { audioRtpCaps, Codec::getCodec(audioCodecName)});
-
-				bool reconnect = false;
-				if(!disableVideo && !sinfo.hasVideo) {
-					LOG(INFO) << "Server doesn't support video";
-					videoCodecName = EMPTY_CAPS.codec.name;
-					reconnect = true;
-				}
-
-				if(!disableAudio && !sinfo.hasAudio) {
-					LOG(INFO) << "Server doesn't support audio";
-					audioCodecName = EMPTY_CAPS.codec.name;
-					reconnect = true;
-				}
-
-				if(reconnect) {
-					LOG(INFO) << "Reconnecting";
-					client.close();
-					pipeline->stop();
-					startClient(host, daemonPort, videoCodecName, audioCodecName, monitorSource, showPointer, xid);
-				}
 			} catch(std::exception& ex) {
 				LOG(ERROR) << "Can't connect to host: " << ex.what();
+				return;
+			}
+
+			LOG(DEBUG) << "video codec: " << videoCodecName;
+			LOG(DEBUG) << "video rtp-caps: " << videoRtpCaps;
+			LOG(DEBUG) << "audio codec: " << audioCodecName;
+			LOG(DEBUG) << "audio rtp-caps: " << audioRtpCaps;
+
+			ServerInfo sinfo = client.announce({ videoRtpCaps, Codec::getCodec(videoCodecName)}, { audioRtpCaps, Codec::getCodec(audioCodecName)});
+
+			bool reconnect = false;
+			if(!disableVideo && !sinfo.hasVideo) {
+				LOG(INFO) << "Server doesn't support video";
+				videoCodecName = EMPTY_CAPS.codec.name;
+				reconnect = true;
+			}
+
+			if(!disableAudio && !sinfo.hasAudio) {
+				LOG(INFO) << "Server doesn't support audio";
+				audioCodecName = EMPTY_CAPS.codec.name;
+				reconnect = true;
+			}
+
+			if(reconnect) {
+				LOG(INFO) << "Reconnecting";
+				client.close();
+				pipeline->stop();
+				startClient(host, daemonPort, videoCodecName, audioCodecName, monitorSource, showPointer, xid);
+				return;
 			}
 
 			try {
-				client.join();
+				string response = client.join();
+				if(response == "kicked") {
+					LOG(INFO) << "You were kicked.";
+				} else
+					LOG(INFO) << "Server: " + response;
+
 			} catch(std::exception& ex) {
-				LOG(INFO) << "You were kicked.";
+				LOG(ERROR) << "Connection error: " << ex.what();
 			}
 
 			pipeline->stop();
@@ -279,7 +286,7 @@ int main(int argc, char *argv[]) {
     po::options_description clientDesc("Client options");
     clientDesc.add_options()
 		("show-pointer,y", "Show the mouse pointer")
-		("video-codec,r", po::value<string>(&videoCodecName)->default_value("MPEG4_HIGH"), "Use given video codec profile")
+		("video-codec,u", po::value<string>(&videoCodecName)->default_value("MPEG4_HIGH"), "Use given video codec profile")
 		//("audio-codec,s", po::value<string>(&audioCodecName)->default_value("OPUS"), "use given audio codec profile")
 		("monitor,m", po::value<int>(&monitorSourceIndex)->default_value(0), "Use given pulse monitor source index");
 
