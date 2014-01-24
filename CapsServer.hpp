@@ -23,6 +23,7 @@ public:
 	CapsServer(int port);
 	virtual ~CapsServer();
 
+	void kick();
 	void close();
 	ClientInfo accept(bool disableVideo, bool disableAudio);
 };

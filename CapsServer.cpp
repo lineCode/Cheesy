@@ -34,6 +34,15 @@ void CapsServer::close() {
 		socket->close();
 }
 
+void CapsServer::kick() {
+	if(socket != NULL && socket->is_open()) {
+		boost::asio::streambuf request;
+		std::ostream request_stream(&request);
+		request_stream << "kicked" << '\n';
+		boost::asio::write(*socket, request);
+	}
+}
+
 ClientInfo CapsServer::accept(bool disableVideo, bool disableAudio) {
 	assert(!(disableVideo && disableAudio));
 	acceptor.listen();
@@ -41,6 +50,7 @@ ClientInfo CapsServer::accept(bool disableVideo, bool disableAudio) {
 	acceptor.accept(*s);
 
 	if(socket != NULL && socket->is_open()) {
+		this->kick();
 		socket->close();
 		delete socket;
 	}
