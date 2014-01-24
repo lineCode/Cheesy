@@ -27,7 +27,7 @@ public:
 	virtual ~CapsClient();
 	void connect(std::string host, int port);
 	ServerInfo announce(Caps videoCaps, Caps audioCaps);
-	void join();
+	std::string join();
 	void close();
 };
 
