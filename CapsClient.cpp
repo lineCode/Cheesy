@@ -61,7 +61,7 @@ void CapsClient::close() {
 	socket.close();
 }
 
-void CapsClient::join() {
+std::string CapsClient::join() {
 	boost::asio::streambuf response;
 	boost::asio::read_until(socket, response, "\n");
 
@@ -70,6 +70,7 @@ void CapsClient::join() {
 	std::string s;
 
 	std::getline(response_stream, s);
+	return s;
 }
 
 } /* namespace cheesy */
