@@ -1,0 +1,107 @@
+.\" Author: Amir Hassan <amir@viel-zu.org>
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH CHEESY 1 "JANUARY 2013"
+.SH NAME
+cheesy \- A simple desktop casting tool transmitting local video and audio to a remote machine.
+.SH SYNOPSIS
+.B cheesy [-hvatydwr] [-p
+.I port
+.B ]
+.B [-f
+.I codecs-file
+.B ]
+.B [-x
+.I xid
+.B ]
+.B [-u
+.I video-codec
+.B ]
+.B [-m
+.I monitor
+.B ]
+.I ip-address
+.SH DESCRIPTION
+.B cheesy
+captures the local display and audio and transmits it to a cheesy server which plays the stream on a remote machine.
+The same command is used to initate a client connection and to run the server (see
+.B -d
+).
+.SH GENERAL OPTIONS
+
+.IP "-h" 4
+.PD 0
+.IP "\-\-help" 4 
+.PD
+Print the help message.
+.IP "-v" 4
+.PD 0
+.IP "\-\-verbose" 4
+.PD
+Increase logging verbosity.
+.IP "-d" 4
+.PD 0
+.IP "\-\-daemon" 4
+.PD
+Run in server mode.
+.IP "-p port" 4
+.PD 0
+.IP "\-\-port port" 4
+.PD
+The base port to either listen on (see
+.B -d
+) or to connect to. Please note the server opens the base port (tcp) and the for ports above the base port (udp).
+.IP "-a" 4
+.PD 0
+.IP "\-\-disable\-audio" 4
+.PD
+Disable sending/receiving of audio data.
+.IP "-v" 4
+.PD 0
+.IP "\-\-disable\-video" 4
+.PD
+Disable sending/receiving of video data.
+.IP "-f file" 4
+.PD 0
+.IP "\-\-codecs\-file file" 4
+.PD
+Path to the codecs file.
+.IP "-x xid" 4
+.PD 0
+.IP "\-\-xid xid" 4
+.PD
+The X11 window ID in decimal of the window to draw into (server mode) or to capture from (client mode).
+.SH SERVER OPTIONS
+.IP "-r" 4
+.PD 0
+.IP "\-\-root" 4
+.PD
+Draw into the X11 root window.
+.IP "-w" 4
+.PD 0
+.IP "\-\-fullscreen" 4
+.PD
+Run in fullscreen mode.
+.SH CLIENT OPTIONS
+.IP "-y" 4
+.PD 0
+.IP "\-\-show-pointer" 4
+.PD
+Also capture the mouse pointer.
+.IP "-u codecname" 4
+.PD 0
+.IP "\-\-video-codec codecname" 4
+.PD
+Use the given codec profile.
+.IP "-m monitoridx" 4
+.PD 0
+.IP "\-\-monitor monitoridx" 4
+.PD
+Use the give pulseaudio monitor source
+.SH FILES
+.I /etc/cheesy/codecs
+.RS
+The system wide codecs file. It consists of colon seperated lines for each codec profile.
+.SH AUTHOR
+Amir Hassan <amir@viel-zu.org>
