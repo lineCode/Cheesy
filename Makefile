@@ -39,7 +39,9 @@ install:
 	cp ${TARGET} ${DESTDIR}/${PREFIX}
 	mkdir -p  ${DESTDIR}/etc/cheesy/
 	cp codecs ${DESTDIR}/etc/cheesy/
-
+	mkdir -p ${DESTDIR}/usr/share/man/man1/
+	gzip -c cheesy.1 > ${DESTDIR}/usr/share/man/man1/cheesy.1.gz
+ 
 clean:
 	rm -f *~ *.dep *.o ${TARGET} 
 
