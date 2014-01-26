@@ -1,3 +1,6 @@
 MPEG4_LOW:ffenc_mpeg4 ! rtpmp4vpay:rtpmp4vdepay ! ffdec_mpeg4
 MPEG4_HIGH:ffenc_mpeg4 trellis=1 flags=0x01000004 me-cmp=2 me-sub-cmp=2 pass=2 bitrate=300000 ! rtpmp4vpay:rtpmp4vdepay ! ffdec_mpeg4
 OPUS:opusenc ! rtpopuspay:rtpopusdepay ! opusdec
+MPEG2_LOW:ffenc_mpeg2video ! ffmux_mpegts ! rtpmp2tpay:rtpmp2tdepay ! ffdemux_mpegts ! ffdec_mpeg2video
+MPEG2_HIGH:ffenc_mpeg2video trellis=2 me-cmp=2 me-sub-cmp=2 pass=2 ! ffmux_mpegts ! rtpmp2tpay:rtpmp2tdepay ! ffdemux_mpegts ! ffdec_mpeg2video
+
