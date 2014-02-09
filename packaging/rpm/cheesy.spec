@@ -37,4 +37,5 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/cheesy
 /etc/cheesy
 /etc/cheesy/codecs
+%doc %{_mandir}/man?/*
 
