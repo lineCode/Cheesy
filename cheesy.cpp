@@ -334,6 +334,7 @@ int main(int argc, char *argv[]) {
 
 	if(vm.count("disable-video") && vm.count("disable-audio")) {
 		std::cerr << "disabling video and audio at the same time doesn't do anything" << std::endl;
+		return 1;
 	}
 
 	if(vm.count("disable-video"))
