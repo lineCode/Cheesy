@@ -8,6 +8,6 @@ Homepage: http://github.com/kallaballa/Cheesy
 
 Package: cheesy
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libgtk2.0-0, libgstreamer0.10-0, gstreamer0.10-x, libxv1, gstreamer0.10-ffmpeg, gstreamer0.10-alsa,  gstreamer0.10-plugins-base, libboost-system1.49.0,  gstreamer0.10-plugins-base, gstreamer0.10-plugins-bad, gstreamer0.10-plugins-good, libpulse0
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${dist:Depends}
 Description: Simple desktop casting tool
  Stream local desktop to a remote machine
