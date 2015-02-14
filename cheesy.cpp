@@ -153,6 +153,7 @@ namespace cheesy {
 
 		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableAudio, bool vdpau, signed long xid) {
       if(vdpau) {
+        LOG(INFO) << "Trying to use VDPAU";
         factory.getServerTemplates().videoConvert="vdpauvideopostprocess";
         factory.getServerTemplates().videoSink="vdpausink name=vpsink";
       } else if(xid == -1) {
@@ -183,7 +184,7 @@ namespace cheesy {
 
 				pipeline = factory.createServerPipeline(daemonPort, ci);
 
-				if(!disableVideo)
+				if(!disableVideo && !vdpau)
 					pipeline->setXwindowID(xid);
 				pipeline->play(false);
 			}
