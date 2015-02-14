@@ -151,8 +151,11 @@ namespace cheesy {
 		Cheesy() {
 		}
 
-		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableAudio, signed long xid) {
-			if(xid == -1) {
+		void startDaemon(int daemonPort, bool fullscreen, bool drawIntoRoot, bool disableVideo, bool disableAudio, bool vdpau, signed long xid) {
+      if(vdpau) {
+        factory.getServerTemplates().videoConvert="vdpauvideopostprocess";
+        factory.getServerTemplates().videoSink="vdpausink name=vpsink";
+      } else if(xid == -1) {
 				if(!disableVideo) {
 					if(!checkXvExtension())
 						factory.getServerTemplates().videoSink="ximagesink name=vpsink";
@@ -293,6 +296,7 @@ int main(int argc, char *argv[]) {
     po::options_description daemonDesc("Daemon options");
     daemonDesc.add_options()
 		("daemon,d", "Run as a daemon")
+    ("vdpau,z", "Use vdpau instead of xvideo")
 		("fullscreen,w", "Run in fullscreen mode")
 		("root,r", "Draw into the root window");
 
@@ -346,7 +350,7 @@ int main(int argc, char *argv[]) {
 		audioCodecName = EMPTY_CAPS.codec.name;
 
 	if (vm.count("daemon")) {
-		cheesy.startDaemon(port, vm.count("fullscreen"), vm.count("root"), vm.count("disable-video"), vm.count("disable-audio"), xid);
+		cheesy.startDaemon(port, vm.count("fullscreen"), vm.count("root"), vm.count("disable-video"), vm.count("disable-audio"), vm.count("vdpau"), xid);
 	} else if (vm.count("ip-address")) {
 		std::vector<string> monitors;
 
